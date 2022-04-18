@@ -1,7 +1,11 @@
 #include "game.h"
 
-color_t opposite_color(color_t color) {
+static color_t opposite_color(color_t color) {
   return (color == WHITE) ? BLACK : WHITE;
+}
+
+static int pawn_direction(color_t color) {
+  return (color == WHITE) ? 1 : -1;
 }
 
 void set_starting_position(board_t *board) {
@@ -26,10 +30,10 @@ void set_starting_position(board_t *board) {
   board->cells[0][5].piece = (piece_t){ WHITE, BISHOP };
   board->cells[7][2].piece = (piece_t){ BLACK, BISHOP };
   board->cells[7][5].piece = (piece_t){ BLACK, BISHOP };
-  board->cells[0][3].piece = (piece_t){ WHITE, QUEEN };
-  board->cells[0][4].piece = (piece_t){ WHITE, KING };
-  board->cells[7][3].piece = (piece_t){ BLACK, QUEEN };
-  board->cells[7][4].piece = (piece_t){ BLACK, KING };
+  board->cells[0][4].piece = (piece_t){ WHITE, QUEEN };
+  board->cells[0][3].piece = (piece_t){ WHITE, KING };
+  board->cells[7][4].piece = (piece_t){ BLACK, QUEEN };
+  board->cells[7][3].piece = (piece_t){ BLACK, KING };
 }
 
 void init_move_list(move_list_t *move_list) {
@@ -63,6 +67,8 @@ static void add_simple_move(
   move.piece = piece;
   move.did_promote = false;
   move.did_capture_piece = false;
+  move.is_king_side_castle = false;
+  move.is_queen_side_castle = false;
   add_to_move_list(move_list, move);
 }
 
@@ -80,6 +86,8 @@ static void add_capturing_move(
   move.piece = piece;
   move.did_promote = false;
   move.did_capture_piece = true;
+  move.is_king_side_castle = false;
+  move.is_queen_side_castle = false;
   move.captured_piece = captured_piece;
   move.captured_piece_loc = captured_piece_loc;
   add_to_move_list(move_list, move);
@@ -98,6 +106,8 @@ static void add_promoting_move(
   move.piece = piece;
   move.did_promote = true;
   move.did_capture_piece = false;
+  move.is_king_side_castle = false;
+  move.is_queen_side_castle = false;
   move.promoted_piece = promoted_piece;
   add_to_move_list(move_list, move);
 }
@@ -117,10 +127,141 @@ static void add_capturing_and_promoting_move(
   move.piece = piece;
   move.did_promote = true;
   move.did_capture_piece = true;
+  move.is_king_side_castle = false;
+  move.is_queen_side_castle = false;
   move.promoted_piece = promoted_piece;
   move.captured_piece = captured_piece;
   move.captured_piece_loc = captured_piece_loc;
   add_to_move_list(move_list, move);
+}
+
+static void add_castling_move(
+  move_list_t *move_list,
+  cell_loc_t start,
+  cell_loc_t end,
+  piece_t piece,
+  bool is_king_side
+) {
+  move_t move;
+  move.end = end;
+  move.start = start;
+  move.piece = piece;
+  move.did_promote = true;
+  move.did_capture_piece = true;
+  move.is_king_side_castle = is_king_side;
+  move.is_queen_side_castle = !is_king_side;
+  move.promoted_piece = promoted_piece;
+  move.captured_piece = captured_piece;
+  move.captured_piece_loc = captured_piece_loc;
+  add_to_move_list(move_list, move);
+}
+
+static bool is_valid_cell_location(cell_loc_t cell_loc) {
+  return (cell_loc.row >= 0) &&
+         (cell_loc.row <= 7) &&
+         (cell_loc.col >= 0) &&
+         (cell_loc.row <= 7);
+}
+
+static int find_knight_cells(cell_loc_t cell_loc, cell_loc_t *result_cell_locs) {
+  int count = 0;
+  int knight_deltas[] = { -2, -1, 1, 2 };
+  for (int row_delta_idx = 0; row_delta_idx < 4; row_delta_idx++) {
+    for (int col_delta_idx = 0; col_delta_idx < 4; col_delta_idx++) {
+      cell_loc_t candidate = (cell_loc_t) {
+        cell_loc.row + knight_deltas[row_delta_idx],
+        cell_loc.col + knight_deltas[col_delta_idx]
+      };
+      if (abs(knight_deltas[row_delta_idx]) != abs(knight_deltas[col_delta_idx]) && is_valid_cell_location(candidate)) {
+        result_cell_locs[count++] = candidate;
+      }
+    }
+  }
+  return count;
+}
+
+bool is_cell_endangered_by_color(board_t *board, cell_loc_t cell_loc, color_t color) {
+  int pawn_direction = (color == WHITE) ? -1 : 1;
+  if (cell_loc.row > 1 && cell_loc.row < 6) {
+    if (cell_loc.col > 0) {
+      cell_t candidate = board->cells[row + pawn_direction][col - 1];
+      if (candidate.is_occupied && candidate.piece.color == color && candidate.piece.type == PAWN) {
+        return true;
+      }
+    }
+    if (cell_loc.col < 7) {
+      cell_t candidate = board->cells[row + pawn_direction][col + 1];
+      if (candidate.is_occupied && candidate.piece.color == color && candidate.piece.type == PAWN) {
+        return true;
+      }
+    }
+  }
+  cell_loc_t knight_cell_locs[8];
+  int knight_cell_loc_cnt = find_knight_cells(cell_loc, &knight_cell_locs[0]);
+  for (int i = 0; i < knight_cell_loc_cnt; i++) {
+    cell_t candidate = board->cells[knight_cell_locs[i].row][knight_cell_locs[i].col];
+    if (candidate.is_occupied && candidate.piece.color == color && candidate.piece.type == KNIGHT) {
+      return true;
+    }
+  }
+  int deltas[] = { -1, 1 };
+  for (int row_di = 0; row_di < 2; row_di++) {
+    for (int col_di = 0; col_di < 2; col_di++) {
+      for (int m = 1; m < 8; m++) {
+        cell_loc_t can = (cell_loc_t) {
+          cell_loc.row + m * deltas[row_di],
+          cell_loc.col + m * deltas[col_di]
+        };
+        if (is_valid_cell_location(can)) {
+          cell_t cell = board->cells[can.row][can.col];
+          if (cell.is_occupied) {
+            if (cell.piece.color == color && (cell.piece.type == BISHOP || cell.piece.type == QUEEN)) {
+              return true;
+            } else {
+              break;
+            }
+          }
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  for (int di = 0; di < 2; di++) {
+    for (int is_row_delta = 0; is_row_delta < 2; is_row_delta++) {
+      for (int m = 1; m < 8; m++) {
+        cell_loc_t can = (cell_loc_t) {
+          cell_loc.row + (is_row_delta == 1 ? 1 : 0) * m * deltas[di],
+          cell_loc.col + (is_row_delta == 0 ? 1 : 0) * m * deltas[di]
+        };
+        if (is_valid_cell_location(can)) {
+          cell_t cell = board->cells[can.row][can.col];
+          if (cell.is_occupied) {
+            if (cell.piece.color == color && (cell.piece.type == ROOK || cell.piece.type == QUEEN)) {
+              return true;
+            } else {
+              break;
+            }
+          }
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  int king_deltas[] = { -1, 0, 1 };
+  for (int row_di = 0; row_di < 3; row_di++) {
+    for (int col_di = 0; col_di < 3; col_di++) {
+      cell_loc_t can = (cell_loc_t) {
+        cell_loc.row + king_deltas[row_di],
+        cell_loc.col + king_deltas[col_di]
+      };
+      if ((king_deltas[row_di] != 0 || king_deltas[col_di] != 0) && is_valid_cell_location(can)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 void calculate_legal_moves(game_t *game, move_list_t *move_list) {
@@ -129,7 +270,7 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
     for (int col = 0; col < 8; col++) {
       cell_t cell = game->position.cells[row][col];
       if (cell.is_occupied && cell.piece.color == color_to_move) {
-        int direction;
+        int direction, king_moved, king_rook_moved, queen_rook_moved;
         int deltas[] = { -1, 1 };
         int king_deltas[] = { -1, 0, 1 };
         int knight_deltas[] = { -2, -1, 1, 2 };
@@ -472,6 +613,52 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
                     break;
                   }
                 }
+              }
+            }
+            king_moved = 0;
+            king_rook_moved = 0;
+            queen_rook_moved = 0;
+            for (int move_idx = 0; move_idx < game->moves_made.count; move_idx++) {
+              move_t move = game->moves_made.entries[move_idx];
+              if (move.is_king_side_castle || move.is_queen_side_castle || (move.piece.color == color_to_move && move.piece.type == KING)) {
+                king_moved = 1;
+                break;
+              }
+              if (move.piece.color == color_to_move && move.start.row == ((color_to_move == WHITE) ? 0 : 7)) {
+                if (move.start.col == 0) {
+                  queen_rook_moved = 1;
+                } else if (move.start.col == 7) {
+                  king_rook_moved = 1;
+                }
+              }
+            }
+            if (!king_moved && !is_cell_endangered_by_color(game->position, (cell_loc_t) { row, col }, opposite_color(color_to_move))) {
+              int base_row = (color_to_move == WHITE) ? 0 : 7;
+              if (!king_rook_moved &&
+                  !game->position.cells[base_row][1].is_occupied &&
+                  !game->position.cells[base_row][2].is_occupied &&
+                  !is_cell_endangered_by_color(game->position, (cell_loc_t) { base_row, 2 }, opposite_color(color_to_move))) {
+                add_castling_move(
+                  move_list,
+                  (cell_loc_t) { row, col },
+                  (cell_loc_t) { row, 1 },
+                  cell.piece,
+                  true
+                );
+              }
+              if (!queen_rook_moved &&
+                  !game->position.cells[base_row][4].is_occupied &&
+                  !game->position.cells[base_row][5].is_occupied &&
+                  !game->position.cells[base_row][6].is_occupied &&
+                  !is_cell_endangered_by_color(game->position, (cell_loc_t) { base_row, 4 }, opposite_color(color_to_move)) &&
+                  !is_cell_endangered_by_color(game->position, (cell_loc_t) { base_row, 5 }, opposite_color(color_to_move))) {
+                add_castling_move(
+                  move_list,
+                  (cell_loc_t) { row, col },
+                  (cell_loc_t) { row, 6 },
+                  cell.piece,
+                  false
+                );
               }
             }
             break;

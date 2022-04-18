@@ -45,6 +45,8 @@ typedef struct move {
   piece_t piece;
   bool did_promote;
   bool did_capture_piece;
+  bool is_king_side_castle;
+  bool is_queen_side_castle;
   cell_loc_t captured_piece_loc;
   piece_t captured_piece;
   piece_t promoted_piece;
