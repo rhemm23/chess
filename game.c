@@ -537,9 +537,4 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
       }
     }
   }
-  int valid_cnt = 0;
-  int valid_indices[move_list->count];
-  for (int i = 0; i < move_list->count; i++) {
-
-  }
 }
