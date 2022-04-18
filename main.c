@@ -19,6 +19,10 @@ int main() {
   calculate_legal_moves(&game, &move_list);
 
   for (int i = 0; i < move_list.count; i++) {
-    printf("%d\n", move_list.entries[i].piece.type);
+    if (move_list.entries[i].piece.type == KING) {
+      printf("%d\n\n", i);
+      printf("queen: %d\n", move_list.entries[i].is_queen_side_castle);
+      printf("king: %d\n", move_list.entries[i].is_king_side_castle);
+    }
   }
 }

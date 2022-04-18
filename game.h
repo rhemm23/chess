@@ -34,22 +34,19 @@ typedef struct board {
   cell_t cells[8][8];
 } board_t;
 
-typedef struct cell_loc {
+typedef struct coord {
   int row;
   int col;
-} cell_loc_t;
+} coord_t;
 
 typedef struct move {
-  cell_loc_t start;
-  cell_loc_t end;
   piece_t piece;
-  bool did_promote;
-  bool did_capture_piece;
+  coord_t start;
+  coord_t end;
+  bool is_enpassant;
   bool is_king_side_castle;
   bool is_queen_side_castle;
-  cell_loc_t captured_piece_loc;
-  piece_t captured_piece;
-  piece_t promoted_piece;
+  piece_type_t promoted_piece_type;
 } move_t;
 
 typedef struct move_list {
