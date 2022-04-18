@@ -146,13 +146,10 @@ static void add_castling_move(
   move.end = end;
   move.start = start;
   move.piece = piece;
-  move.did_promote = true;
-  move.did_capture_piece = true;
+  move.did_promote = false;
+  move.did_capture_piece = false;
   move.is_king_side_castle = is_king_side;
   move.is_queen_side_castle = !is_king_side;
-  move.promoted_piece = promoted_piece;
-  move.captured_piece = captured_piece;
-  move.captured_piece_loc = captured_piece_loc;
   add_to_move_list(move_list, move);
 }
 
@@ -182,15 +179,15 @@ static int find_knight_cells(cell_loc_t cell_loc, cell_loc_t *result_cell_locs) 
 
 bool is_cell_endangered_by_color(board_t *board, cell_loc_t cell_loc, color_t color) {
   int pawn_direction = (color == WHITE) ? -1 : 1;
-  if (cell_loc.row > 1 && cell_loc.row < 6) {
+  if ((color == WHITE && cell_loc.row > 1) && (color == BLACK && cell_loc.row < 6)) {
     if (cell_loc.col > 0) {
-      cell_t candidate = board->cells[row + pawn_direction][col - 1];
+      cell_t candidate = board->cells[cell_loc.row + pawn_direction][cell_loc.col - 1];
       if (candidate.is_occupied && candidate.piece.color == color && candidate.piece.type == PAWN) {
         return true;
       }
     }
     if (cell_loc.col < 7) {
-      cell_t candidate = board->cells[row + pawn_direction][col + 1];
+      cell_t candidate = board->cells[cell_loc.row + pawn_direction][cell_loc.col + 1];
       if (candidate.is_occupied && candidate.piece.color == color && candidate.piece.type == PAWN) {
         return true;
       }
@@ -257,7 +254,10 @@ bool is_cell_endangered_by_color(board_t *board, cell_loc_t cell_loc, color_t co
         cell_loc.col + king_deltas[col_di]
       };
       if ((king_deltas[row_di] != 0 || king_deltas[col_di] != 0) && is_valid_cell_location(can)) {
-        return true;
+        cell_t cell = board->cells[can.row][can.col];
+        if (cell.is_occupied && cell.piece.color == color && cell.piece.type == KING) {
+          return true;
+        }
       }
     }
   }
@@ -584,8 +584,8 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
             break;
 
           case KING:
-            for (int row_delta_idx = 0; row_delta_idx < 2; row_delta_idx++) {
-              for (int col_delta_idx = 0; col_delta_idx < 2; col_delta_idx++) {
+            for (int row_delta_idx = 0; row_delta_idx < 3; row_delta_idx++) {
+              for (int col_delta_idx = 0; col_delta_idx < 3; col_delta_idx++) {
                 int row_delta = king_deltas[row_delta_idx];
                 int col_delta = king_deltas[col_delta_idx];
                 int new_row = row + row_delta;
@@ -632,12 +632,12 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
                 }
               }
             }
-            if (!king_moved && !is_cell_endangered_by_color(game->position, (cell_loc_t) { row, col }, opposite_color(color_to_move))) {
+            if (!king_moved && !is_cell_endangered_by_color(&game->position, (cell_loc_t) { row, col }, opposite_color(color_to_move))) {
               int base_row = (color_to_move == WHITE) ? 0 : 7;
               if (!king_rook_moved &&
                   !game->position.cells[base_row][1].is_occupied &&
                   !game->position.cells[base_row][2].is_occupied &&
-                  !is_cell_endangered_by_color(game->position, (cell_loc_t) { base_row, 2 }, opposite_color(color_to_move))) {
+                  !is_cell_endangered_by_color(&game->position, (cell_loc_t) { base_row, 2 }, opposite_color(color_to_move))) {
                 add_castling_move(
                   move_list,
                   (cell_loc_t) { row, col },
@@ -650,8 +650,8 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
                   !game->position.cells[base_row][4].is_occupied &&
                   !game->position.cells[base_row][5].is_occupied &&
                   !game->position.cells[base_row][6].is_occupied &&
-                  !is_cell_endangered_by_color(game->position, (cell_loc_t) { base_row, 4 }, opposite_color(color_to_move)) &&
-                  !is_cell_endangered_by_color(game->position, (cell_loc_t) { base_row, 5 }, opposite_color(color_to_move))) {
+                  !is_cell_endangered_by_color(&game->position, (cell_loc_t) { base_row, 4 }, opposite_color(color_to_move)) &&
+                  !is_cell_endangered_by_color(&game->position, (cell_loc_t) { base_row, 5 }, opposite_color(color_to_move))) {
                 add_castling_move(
                   move_list,
                   (cell_loc_t) { row, col },
