@@ -7,11 +7,7 @@ int main() {
   game_t game;
   init_game(&game);
 
-  game.position.cells[0][1].is_occupied = false;
-  game.position.cells[0][2].is_occupied = false;
-  game.position.cells[0][4].is_occupied = false;
-  game.position.cells[0][5].is_occupied = false;
-  game.position.cells[0][6].is_occupied = false;
+  game.position.cells[1][3].is_occupied = false;
 
   move_list_t move_list;
   init_move_list(&move_list);
@@ -19,10 +15,7 @@ int main() {
   calculate_legal_moves(&game, &move_list);
 
   for (int i = 0; i < move_list.count; i++) {
-    if (move_list.entries[i].piece.type == KING) {
-      printf("%d\n\n", i);
-      printf("queen: %d\n", move_list.entries[i].is_queen_side_castle);
-      printf("king: %d\n", move_list.entries[i].is_king_side_castle);
-    }
+    printf("%d: (%d, %d) -> (%d, %d)\n", move_list.entries[i].piece.type, move_list.entries[i].start.row, move_list.entries[i].start.col, move_list.entries[i].end.row, move_list.entries[i].end.col);
   }
+  printf("%d\n", move_list.count);
 }

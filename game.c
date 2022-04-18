@@ -63,7 +63,7 @@ static bool is_valid_coord(coord_t coord) {
   return (coord.row >= 0) &&
          (coord.row <= 7) &&
          (coord.col >= 0) &&
-         (coord.row <= 7);
+         (coord.col <= 7);
 }
 
 bool is_cell_endangered_by_color(board_t *board, coord_t coord, color_t color) {
@@ -167,18 +167,35 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
         switch (cell.piece.type) {
           case PAWN:
             if (!game->position.cells[row + pawn_direction(color_to_move)][col].is_occupied) {
-              add_to_move_list(
-                move_list,
-                (move_t) {
-                  cell.piece,
-                  (coord_t) { row, col },
-                  (coord_t) { row + pawn_direction(color_to_move), col },
-                  false,
-                  false,
-                  false,
-                  (piece_type_t) 0
+              if ((color_to_move == WHITE && row == 6) || (color_to_move == BLACK && row == 1)) {
+                for (int piece_type = KNIGHT; piece_type <= QUEEN; piece_type++) {
+                  add_to_move_list(
+                    move_list,
+                    (move_t) {
+                      cell.piece,
+                      (coord_t) { row, col },
+                      (coord_t) { row + pawn_direction(color_to_move), col },
+                      false,
+                      false,
+                      false,
+                      (piece_type_t) piece_type
+                    }
+                  );
                 }
-              );
+              } else {
+                add_to_move_list(
+                  move_list,
+                  (move_t) {
+                    cell.piece,
+                    (coord_t) { row, col },
+                    (coord_t) { row + pawn_direction(color_to_move), col },
+                    false,
+                    false,
+                    false,
+                    (piece_type_t) 0
+                  }
+                );
+              }
               if (((color_to_move == WHITE && row == 1) ||
                   (color_to_move == BLACK && row == 6)) &&
                   !game->position.cells[row + pawn_direction(color_to_move) * 2][col].is_occupied) {
@@ -204,18 +221,35 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
               if (is_valid_coord(coord)) {
                 cell_t can = game->position.cells[coord.row][coord.col];
                 if (can.is_occupied && can.piece.color == opposite_color(color_to_move)) {
-                  add_to_move_list(
-                    move_list,
-                    (move_t) {
-                      cell.piece,
-                      (coord_t) { row, col },
-                      coord,
-                      false,
-                      false,
-                      false,
-                      (piece_type_t) 0
+                  if ((color_to_move == WHITE && row == 6) || (color_to_move == BLACK && row == 1)) {
+                    for (int piece_type = KNIGHT; piece_type <= QUEEN; piece_type++) {
+                      add_to_move_list(
+                        move_list,
+                        (move_t) {
+                          cell.piece,
+                          (coord_t) { row, col },
+                          coord,
+                          false,
+                          false,
+                          false,
+                          (piece_type_t) piece_type
+                        }
+                      );
                     }
-                  );
+                  } else {
+                    add_to_move_list(
+                      move_list,
+                      (move_t) {
+                        cell.piece,
+                        (coord_t) { row, col },
+                        coord,
+                        false,
+                        false,
+                        false,
+                        (piece_type_t) 0
+                      }
+                    );
+                  }
                 }
               }
             }
@@ -502,5 +536,10 @@ void calculate_legal_moves(game_t *game, move_list_t *move_list) {
         }
       }
     }
+  }
+  int valid_cnt = 0;
+  int valid_indices[move_list->count];
+  for (int i = 0; i < move_list->count; i++) {
+
   }
 }
